@@ -1,0 +1,19 @@
+# Environment
+.venv
+venv/
+env/
+
+.idea/
+*__pycache__/
+
+# git
+*.git*
+
+# tests
+./tests/
+./.pytest_cache
+
+*.hypothesis/
+
+news_media/
+swagger-spec.yaml

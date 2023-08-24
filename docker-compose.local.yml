@@ -1,0 +1,97 @@
+version: "3.9"
+services:
+  video_upload_consumer:
+    image: basereq:1.0
+    container_name: video_upload_consumer
+    build:
+      context: .
+      dockerfile: base.Dockerfile
+      cache_from:
+        - scratch
+    depends_on:
+      - db
+    command: ["python", "manage.py", "video_upload_consumer", "run"]
+
+#  face_recognition_consumer:
+#    image: basereq:1.0
+#    container_name: face_recognition_consumer
+#    build:
+#      context: .
+#      dockerfile: base.Dockerfile
+#      cache_from:
+#        - scratch
+#    depends_on:
+#      - db
+#    command: ["python", "manage.py", "face_recognition_consumer", "run"]
+
+  app:
+    container_name: app
+    build:
+      context: .
+      dockerfile: local.Dockerfile
+      cache_from:
+        - scratch
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./app/:/app/
+      - ./migrations:/migrations/
+    depends_on:
+      - db
+    restart: always
+
+  db:
+    container_name: db
+    image: postgres:14
+    environment:
+      - POSTGRES_DB=db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    ports:
+      - "7777:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./migrations/:/migrations/
+#
+#  pgadmin:
+#    container_name: pgadmin4
+#    image: dpage/pgadmin4
+#    restart: always
+#    environment:
+#      PGADMIN_DEFAULT_EMAIL: app@3divi.com
+#      PGADMIN_DEFAULT_PASSWORD: 1234
+#    ports:
+#      - "127.0.0.1:5052:80"
+#    volumes:
+#      - pgadmin4:/var/lib/pgadmin
+#
+  s3:
+    container_name: s3
+    image: minio/minio
+    volumes:
+      - ./data:/data
+    environment:
+      - MINIO_ACCESS_KEY=access-key
+      - MINIO_SECRET_KEY=secret-key
+    ports:
+      - "9000:9000"
+    command: server /data
+
+  zookeeper:
+    container_name: zookeper
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+
+  kafka:
+    container_name: kafka
+    image: wurstmeister/kafka
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    ports:
+      - "9092:9092"
+
+volumes:
+  postgres:
+  pgadmin4:
