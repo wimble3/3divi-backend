@@ -23,7 +23,5 @@ env.sh
 
 .DS_Store
 
-local.conf
-
 *.hypothesis/
 tests/meta/
