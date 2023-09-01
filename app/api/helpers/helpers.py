@@ -4,8 +4,6 @@ import boto3
 
 from libs.transport.publisher.kafka_publisher import KafkaPublisher
 
-from settings import FACE_RECOGNITION_TOPIC
-
 from werkzeug.datastructures import FileStorage  # noqa: F401
 
 
@@ -56,19 +54,3 @@ def delete_file(file_path):
         None:
     """
     os.remove(file_path)
-
-
-def send_kafka_message_to_face_recognition(filepath):
-    """
-    Starts video recognition process.
-    Args:
-        filepath (str): filepath
-
-    Returns:
-
-    """
-    publisher = KafkaPublisher()
-    publisher.send_message(
-        FACE_RECOGNITION_TOPIC,
-        filepath=filepath
-    )

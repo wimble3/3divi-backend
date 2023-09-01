@@ -1,6 +1,7 @@
 from flask import Blueprint
 
-from libs.transport.consumer.kafka_consumers import VideoUploadConsumer
+from libs.transport.consumer.kafka_consumers import VideoUploadConsumer, \
+    FaceRecognitionConsumer
 
 from settings import FACE_RECOGNITION_TOPIC, KAFKA_BROKER
 
@@ -14,8 +15,10 @@ def run():
     Returns:
         None:
     """
-    consumer = VideoUploadConsumer(
+    # @@@
+    consumer = FaceRecognitionConsumer(
         FACE_RECOGNITION_TOPIC,
+        group_id="face_recognition_group",
         broker=KAFKA_BROKER,
     )
     consumer.activate_listener()

@@ -15,8 +15,10 @@ def run():
     Returns:
         None:
     """
+    # @@@
     consumer = VideoUploadConsumer(
         VIDEO_UPLOAD_TOPIC,
+        group_id="video_upload_group",
         broker=KAFKA_BROKER,
     )
     consumer.activate_listener()

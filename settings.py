@@ -33,7 +33,7 @@ SQLALCHEMY_ENGINE_OPTIONS = {
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 SQLALCHEMY_ECHO = False  # SQL debug
 DATABASE_CONNECT_OPTIONS = {}
-DB_TBL_PRFX = "app_"
+DB_TBL_PRFX = "3divi_"
 
 # App
 HOST = _config.get("app", "host", fallback="0.0.0.0")
@@ -87,4 +87,18 @@ FACE_RECOGNITION_TOPIC = _config.get(
     "kafka",
     "face_recognition_topic",
     fallback="face_recognition_topic"
+)
+
+# redis
+REDIS_HOST = _config.get(
+    "redis",
+    "host",
+)
+REDIS_PORT = _config.getint(
+    "redis",
+    "port",
+)
+REDIS_DB = _config.getint(
+    "redis",
+    "db",
 )

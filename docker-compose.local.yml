@@ -12,32 +12,32 @@ services:
       - db
     command: ["python", "manage.py", "video_upload_consumer", "run"]
 
-#  face_recognition_consumer:
-#    image: basereq:1.0
-#    container_name: face_recognition_consumer
-#    build:
-#      context: .
-#      dockerfile: base.Dockerfile
-#      cache_from:
-#        - scratch
-#    depends_on:
-#      - db
-#    command: ["python", "manage.py", "face_recognition_consumer", "run"]
+  face_recognition_consumer:
+    container_name: face_recognition_consumer
+    build:
+      context: .
+      dockerfile: local.Dockerfile
+      cache_from:
+        - scratch
+    depends_on:
+      - db
+    volumes:
+      - ./app/media/:/app/media/
+    command: ["python", "manage.py", "face_recognition_consumer", "run"]
 
   app:
     container_name: app
     build:
       context: .
-      dockerfile: local.Dockerfile
+      dockerfile: app.Dockerfile
       cache_from:
         - scratch
     ports:
       - "5000:5000"
     volumes:
       - ./app/:/app/
-      - ./migrations:/migrations/
     depends_on:
-      - db
+      - video_upload_consumer
     restart: always
 
   db:
@@ -52,30 +52,30 @@ services:
     volumes:
       - postgres:/var/lib/postgresql/data
       - ./migrations/:/migrations/
-#
-#  pgadmin:
-#    container_name: pgadmin4
-#    image: dpage/pgadmin4
-#    restart: always
-#    environment:
-#      PGADMIN_DEFAULT_EMAIL: app@3divi.com
-#      PGADMIN_DEFAULT_PASSWORD: 1234
-#    ports:
-#      - "127.0.0.1:5052:80"
-#    volumes:
-#      - pgadmin4:/var/lib/pgadmin
-#
+
+  pgadmin:
+    container_name: pgadmin4
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: app@3divi.com
+      PGADMIN_DEFAULT_PASSWORD: 1234
+    ports:
+      - "127.0.0.1:5052:80"
+    volumes:
+      - pgadmin4:/var/lib/pgadmin
+
   s3:
     container_name: s3
     image: minio/minio
     volumes:
-      - ./data:/data
+      - ./localstack:/localstack
     environment:
       - MINIO_ACCESS_KEY=access-key
       - MINIO_SECRET_KEY=secret-key
     ports:
       - "9000:9000"
-    command: server /data
+    command: server /localstack
 
   zookeeper:
     container_name: zookeper
@@ -91,6 +91,16 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     ports:
       - "9092:9092"
+
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+
 
 volumes:
   postgres:

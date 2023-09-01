@@ -2,11 +2,14 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
+from app import app
 from app.api.events import process_after_video_upload_views
 
 from kafka import KafkaConsumer
 from kafka.errors import CommitFailedError
 
+from app.api.videos.helpers import create_video
+from libs.face_recognition.face_recognition import FaceRecognition
 from settings import KAFKA_BROKER, NUM_MAX_THREADS
 
 
@@ -27,7 +30,7 @@ class Consumer:
     logger.setLevel(logging.INFO)
 
     def __init__(
-            self, topic, broker=KAFKA_BROKER,
+            self, topic, group_id, broker=KAFKA_BROKER,
             clear_messages=False, threads=8):
         """
         Sets base parameters, checks num of threads.
@@ -40,12 +43,12 @@ class Consumer:
         self.consumer = None
         self.topic = topic
         self.broker = broker
-        self.group_id = "group"
+        self.group_id = group_id
         self.clear_messages = clear_messages
         self.max_workers = threads
 
         if threads > NUM_MAX_THREADS:
-            self.logger.warning(f"Sorry, max threads: {NUM_MAX_THREADS}")
+            logging.warning(f"Sorry, max threads: {NUM_MAX_THREADS}")
             self.max_workers = NUM_MAX_THREADS
 
         self.pool = ThreadPoolExecutor(max_workers=self.max_workers)
@@ -64,15 +67,15 @@ class Consumer:
                     if not self.clear_messages:
                         self.pool.submit(self.process, message)
                     else:
-                        self.logger.info("Ack")
+                        logging.info("Ack")
                     self.consumer.commit()
                 except Exception as e:
-                    self.logger.error(f"Unexpected error: {e}")
+                    logging.error(f"Unexpected error: {e}")
         except CommitFailedError:
-            self.logger.error("Commit error, reconnecting to kafka group")
+            logging.error("Commit error, reconnecting to kafka group")
             self._reconnect()
         except Exception as e:
-            self.logger.error(f"Unexpected error: {e}")
+            logging.error(f"Unexpected error: {e}")
 
     def _reconnect(self):
         """
@@ -93,7 +96,7 @@ class Consumer:
             None:
         """
         self.consumer.close()
-        self.logger.info("Consumer is closed")
+        logging.info("Consumer is closed")
 
     def subscribe_topic(self):
         """
@@ -102,7 +105,7 @@ class Consumer:
             None:
         """
         self.consumer.subscribe([self.topic])
-        self.logger.info("Consumer is listening")
+        logging.info("Consumer is listening")
 
     def connect(self):
         """
@@ -116,7 +119,7 @@ class Consumer:
             auto_offset_reset="latest",
             enable_auto_commit=False,
             api_version=(2, 1, 0),
-            value_deserializer=lambda m: json.loads(m.decode("utf-8"))
+            value_deserializer=lambda m: json.loads(m.decode("utf-8")),
         )
 
     def process(self, message):
@@ -130,9 +133,9 @@ class Consumer:
         """
         result = self.on_message(message)
         if result:
-            self.logger.info("ack")
+            logging.info("ack")
         else:
-            self.logger.info("reject")
+            logging.info("reject")
 
     def on_message(self, message):
         """Empty method for child consumers. Using in self.process()"""
@@ -155,39 +158,52 @@ class VideoUploadConsumer(Consumer):
         """
         try:
             filepath = message.value.get("filepath")
-            # filename = message.value.get(
-            # "id") + "." + filepath.split(".")[-1]
-            self.logger.info(f"filepath: {filepath}")
-            # filepath, bucket, object_key = upload_file_to_s3(
-            #     message.value.get("filepath"), "bucket", filename)
+            file_id = message.value.get("file_id")
+            logging.info(f"Uploading video with id: {file_id}")
 
-            process_after_video_upload_views(filepath)
+            process_after_video_upload_views(file_id, filepath)
             return True
         except AssertionError as e:
-            self.logger.error(f"Assertion error: {e}")
+            logging.error(f"Assertion error: {e}")
             return False
 
-    class FaceRecognitionConsumer(Consumer):
-        """
-        A child consumer to get messages about videos which needed to
-        processing of recognition from kafka.
-        """
-        def on_message(self, message):
-            """
-            Starts process of recognition.
-            Args:
-                message (dict): message from kafka publisher
 
-            Returns:
-                bool: True if file has been uploaded to s3,
-                    db row has been created else False
-            """
-            try:
-                filepath = message.value.get("filepath")
-                self.logger.info(f"filepath: {filepath}")
-                # face_recognition = FaceRecognition(filepath)
-                # face_recognition.process()
-                return True
-            except AssertionError as e:
-                self.logger.error(f"Assertion error: {e}")
-                return False
+class FaceRecognitionConsumer(Consumer):
+    """
+    A child consumer to get messages about videos which needed to
+    processing of recognition from kafka.
+    """
+    def on_message(self, message):
+        """
+        Starts process of recognition.
+        Args:
+            message (dict): message from kafka publisher
+
+        Returns:
+            bool: True if file has been uploaded to s3,
+                db row has been created else False
+        """
+        try:
+            filepath = message.value.get("filepath")
+            file_id = message.value.get("file_id")
+            face_recognition = FaceRecognition(file_id, filepath)
+            faces_list, names_list = face_recognition.process()
+
+            data = {"faces_list": faces_list, "names_list": names_list}
+
+            with app.app_context():
+                is_video_added = create_video(
+                    file_id, data, face_recognition.status,
+                    face_recognition.frame_num, face_recognition.persons,
+                    filepath
+                )
+                if not is_video_added:
+                    logging.error(
+                        f"File with id {file_id} has not been created in db")
+                    return False
+            logging.info(
+                f"File with id {file_id} created in db successfully")
+            return True
+        except AssertionError as e:
+            logging.error(f"Assertion error: {e}")
+            return False

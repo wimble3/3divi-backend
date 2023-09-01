@@ -3,7 +3,7 @@ after_video_upload_views_funcs = []
 
 def after_video_upload_views(func):
     """Decorator that registers function like event.
-    Functions are called video has been uploaded to s3.
+    Functions are called if video has been uploaded to s3.
 
     Args:
         func (collections.abc.Callable): Registered function.
@@ -17,9 +17,11 @@ def after_video_upload_views(func):
         return func
 
 
-def process_after_video_upload_views(filepath):
-    """Actions after video has been uploaded.
+def process_after_video_upload_views(file_id, filepath):
+    """
+    Actions after video has been uploaded.
     Args:
+        file_id (str): file id
         filepath (dict): filepath
 
     Returns:
@@ -27,4 +29,4 @@ def process_after_video_upload_views(filepath):
     """
     for func in after_video_upload_views_funcs:
         if callable(func):
-            func(filepath)
+            func(file_id, filepath)
